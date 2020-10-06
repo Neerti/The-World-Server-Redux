@@ -102,6 +102,7 @@ var/list/name_to_material
 	var/list/composite_material  // If set, object matter var will be a list containing these values.
 	var/luminescence
 	var/radiation_resistance = 0 // Radiation resistance, which is added on top of a material's weight for blocking radiation. Needed to make lead special without superrobust weapons.
+	var/datum/element/element = null // Element datum containing more physical properties like specific heat capacity.
 
 	// Placeholder vars for the time being, todo properly integrate windows/light tiles/rods.
 	var/created_window
@@ -493,6 +494,7 @@ var/list/name_to_material
 
 /material/iron
 	name = "iron"
+	element = /datum/element/iron
 	stack_type = /obj/item/stack/material/iron
 	icon_colour = "#5C5454"
 	weight = 22

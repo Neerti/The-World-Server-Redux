@@ -119,6 +119,28 @@ L = the distance through which conduction heat transfer is taking place, ft.
 /datum/thermodynamics/proc/get_total_heat(datum/element/E, mass, temperature)
 	return temperature * mass * E.specific_heat_capacity
 
+// Returns the phase of matter that the input element should be.
+/datum/thermodynamics/proc/should_phase_change(datum/element/E, temperature, current_phase)
+	var/hysteresis = E.thermodynamic_hysteresis
+	// The hysteresis value is used to artifically prevent oscillating between two phases.
+	// E.g. boiling water happens at 102C, and condensing steam happens at 98C, instead of both at 100C.
+	// It doesn't work like that in real life.
+	switch(current_phase)
+		if(ELEMENT_PHASE_SOLID) // Currently a solid.
+			if(temperature >= E.melting_point + hysteresis)
+				return ELEMENT_PHASE_LIQUID // Melt into a liquid.
+		
+		if(ELEMENT_PHASE_LIQUID) // Currently a liquid.
+			if(temperature >= E.boiling_point + hysteresis)
+				return ELEMENT_PHASE_GAS // Vaporize into a gas.
+			else if(temperature < E.melting_point + hysteresis)
+				return ELEMENT_PHASE_SOLID // Freeze into a solid.
+		
+		if(ELEMENT_PHASE_GAS) // Currently a gas.
+			if(temperature < E.melting_point + hysteresis)
+				return ELEMENT_PHASE_LIQUID // Condense into a liquid.
+	return current_phase // Do nothing.
+
 // TODO remove this before going live.
 /client/verb/test_thermodynamic_equalize()
 	var/list/elements = list(new /datum/element/water(), new /datum/element/iron())
@@ -129,22 +151,47 @@ L = the distance through which conduction heat transfer is taking place, ft.
 
 // Temprature datum.
 // Allows any object that wants to keep track of temperature to do so.
+// Also keeps track of things related to temperature, like the phase of matter it should be in.
 /datum/temperature
-	var/datum/holder = null
 	var/datum/element/element = null
 	var/temperature = T20C // Kelvin.
+	var/phase = null
 
-/datum/temperature/New(datum/new_holder, datum/element/new_element, new_temperature)
-	holder = new_holder
+/datum/temperature/New(datum/element/new_element, new_temperature)
 	element = new_element
 	temperature = new_temperature
+
+	// `thermodynamic_hysteresis` is ignored on init since we don't want to have to define an initial phase.
+	if(temperature >= element.boiling_point)
+		phase = ELEMENT_PHASE_GAS
+	else if (temperature >= element.melting_point)
+		phase = ELEMENT_PHASE_LIQUID
+	else
+		phase = ELEMENT_PHASE_SOLID
 
 /datum/temperature/Destroy()
 	element = null
 	return ..()
 
-/datum/temperature/proc/add_thermal_energy(joules, grams)
+/datum/temperature/proc/on_phase_change(old_phase, new_phase)
+
+/datum/temperature/proc/add_thermal_energy(datum/element/element, grams, joules)
 	. = GLOB.thermodynamics.add_thermal_energy(element, grams, joules)
+	if(. < 0) // Energy being removed.
+		if(temperature < TCMB)
+			return 0
+		var/thermal_energy_floor = -(temperature - TCMB) * element.specific_heat_capacity
+		. = max(., thermal_energy_floor)
+	
+	temperature += . / element.specific_heat_capacity
+
+	var/new_phase = GLOB.thermodynamics.should_phase_change(element, temperature, phase)
+
+	if(phase != new_phase)
+		on_phase_change(phase, new_phase)
+		phase = new_phase
+		
+
 
 /*
 	if (total_moles == 0)
@@ -159,6 +206,12 @@ L = the distance through which conduction heat transfer is taking place, ft.
 	temperature += thermal_energy/heat_capacity
 	return thermal_energy
 */
+
+/obj/proc/get_mass()
+	return null
+
+/obj/item/stack/material/get_mass()
+	return amount * SHEETS_TO_GRAMS
 
 // Elements, and "elements".
 
@@ -222,6 +275,7 @@ L = the distance through which conduction heat transfer is taking place, ft.
 	name_as_solid = "iron"
 	name_as_liquid = "molten iron"
 	associated_reagent = /datum/reagent/iron
+	associated_material = /material/iron
 
 	melting_point = 1811
 	boiling_point = 3143
