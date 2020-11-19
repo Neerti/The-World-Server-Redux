@@ -1,3 +1,6 @@
+#define PERSISTENT_PHOTO_DIRECTORY "data/persistent/images/photos/"
+
+
 // Saves a 'simple' variable, such as a string, number, list, or assocative list.
 // Intended to be used inside of an overrided 'save_serialized_data()` proc.
 // `NAMEOF()` makes it so compilation fails if the variable name stops existing instead of silently breaking persistence.

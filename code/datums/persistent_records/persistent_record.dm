@@ -12,10 +12,10 @@
 
 /datum/persistent_record/save_serialized_data()
 	. = ..()
-	.[NAMEOF(src, name)] = name
+	SERIALIZE_VAR(name)
 	SERIALIZE_VAR(desc)
-	.[NAMEOF(src, unique_id)] = unique_id
-	.[NAMEOF(src, logs)] = logs
+	SERIALIZE_VAR(unique_id)
+	SERIALIZE_VAR(logs)
 	SERIALIZE_VAR(creator_name)
 	SERIALIZE_VAR(creator_ckey)
 	SERIALIZE_VAR(creator_uid)
@@ -23,10 +23,10 @@
 
 /datum/persistent_record/load_deserialized_data(list/_data)
 	..()
-	name = _data[NAMEOF(src, name)]
+	DESERIALIZE_VAR(name)
 	DESERIALIZE_VAR(desc)
-	unique_id = _data[NAMEOF(src, unique_id)]
-	logs = _data[NAMEOF(src, logs)]
+	DESERIALIZE_VAR(unique_id)
+	DESERIALIZE_VAR(logs)
 	DESERIALIZE_VAR(creator_name)
 	DESERIALIZE_VAR(creator_ckey)
 	DESERIALIZE_VAR(creator_uid)
@@ -34,7 +34,7 @@
 
 // Called when a new record is made, that wasn't the result of deserialization.
 /datum/persistent_record/proc/on_new_record(mob/living/user)
-	unique_id = "[game_id]_[++GLOB.persistent_record_incrementer]"
+	unique_id = "[game_id]-[++GLOB.persistent_record_incrementer]"
 	creator_name = user.name
 	creator_ckey = ckey(user.key)
 	creator_uid = user.GetIdCard()?.unique_ID
@@ -44,7 +44,7 @@
 
 // Appends the ingame logs for this record.
 /datum/persistent_record/proc/add_record_log(line)
-	logs += "[full_game_time()] [get_game_hour()]:[get_game_minute()]:[get_game_second()] - [line]"
+	logs += "[stationdate2text()] [get_game_hour()]:[get_game_minute()]:[get_game_second()] - [line]"
 
 /datum/persistent_record/proc/display_html(mob/living/user, admin_view = FALSE)
 	. = list()
@@ -57,12 +57,6 @@
 	for(var/thing in attachments)
 		var/datum/record_attachment/A = thing
 		. += href(src, list("view_attachment" = attachments.Find(A)), A.title)
-//		. += "<h3>[A.title]</h3>"
-//		. += "[A.content]<br>"
-//		if(A.uploader_name)
-//			. += "<i>Uploaded by <b>[A.uploader_name]</b>.</i>"
-//		if(admin_view && A.uploader_ckey)
-//			. += " (Ckey: [A.uploader_ckey])"
 	
 	. += "<hr>"
 	. += "<h2>Logs</h2>"
@@ -74,6 +68,7 @@
 /datum/record_attachment
 	var/title = null
 	var/content = null
+	var/image_id = null // If set, a persistent image will be loaded and shown to anyone viewing this record.
 	var/uploader_name = null
 	var/uploader_ckey = null
 	var/uploader_uid = null
@@ -91,6 +86,7 @@
 	. = ..()
 	.[NAMEOF(src, title)] = title
 	.[NAMEOF(src, content)] = content
+	SERIALIZE_VAR(image_id)
 	.[NAMEOF(src, uploader_name)] = uploader_name
 	SERIALIZE_VAR(uploader_ckey)
 	SERIALIZE_VAR(uploader_uid)
@@ -99,6 +95,7 @@
 	..()
 	title = _data[NAMEOF(src, title)]
 	content = _data[NAMEOF(src, content)]
+	DESERIALIZE_VAR(image_id)
 	uploader_name = _data[NAMEOF(src, uploader_name)]
 	uploader_ckey = _data[NAMEOF(src, uploader_ckey)]
 	DESERIALIZE_VAR(uploader_uid)

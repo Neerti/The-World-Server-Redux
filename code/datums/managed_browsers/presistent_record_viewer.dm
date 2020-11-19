@@ -9,6 +9,8 @@
 	size_y = 680
 	var/datum/persistent_record/loaded_record = null // Current record being viewed, if any.
 	var/loaded_record_file_path = null // Where that current record exists on disk.
+	var/collapsed_attachments_list = TRUE
+	var/collapsed_log_list = TRUE
 	
 	var/datum/record_attachment/opened_attachment = null
 	
@@ -52,7 +54,9 @@
 		return
 	
 	loaded_record = R
-	loaded_record_file_path = file_path // This is make it easy to save to the same file path.
+	loaded_record_file_path = file_path // This makes it easy to save to the same file path.
+	collapsed_attachments_list = TRUE
+	collapsed_log_list = TRUE
 	return R
 
 // Saves the loaded record object, serializing it into a .json file that gets written to the inputted file path.
@@ -70,6 +74,7 @@
 	var/datum/persistent_record/R = new persistent_record_type()
 	R.on_new_record(user)
 	loaded_record = R
+	loaded_record_file_path = default_new_record_filepath(R)
 
 // Defines the default file path for new records. Make sure this results in a unique path or it will overwrite things.
 // It's generally a bad idea to let players be able to directly name the file that's saved to disk.
@@ -91,6 +96,70 @@
 
 	load_record(file_path)
 
+#define SEARCH_METHOD_ID		"by unique ID"
+#define SEARCH_METHOD_NAME		"by name"
+#define SEARCH_METHOD_DESC		"by description"
+#define SEARCH_METHOD_CREATOR	"by creator"
+
+// Prompts the user to enter a search method and then a string to search for.
+/datum/managed_browser/persistent_record_viewer/proc/search_query(mob/user)
+	var/list/options = list(SEARCH_METHOD_ID, SEARCH_METHOD_NAME, SEARCH_METHOD_DESC, SEARCH_METHOD_CREATOR)
+	
+	var/search_method = input(user, "Select search method.", "Record Search", SEARCH_METHOD_ID) as null|anything in options
+	if(isnull(search_method))
+		return
+	
+	var/search_target = input(user, "Enter search term.", "Searching [search_method].") as null|text
+	if(isnull(search_target))
+		return
+	
+	var/list/results = search_records(search_target, search_method)
+	if(!LAZYLEN(results))
+		to_chat(user, SPAN_WARNING("Searching [search_method] for '[search_target]' produced no results."))
+		return
+	
+	var/list/cleaned_results = directory.clean_file_paths(results)
+	var/choice = input(user, "Choose a file.", "File Selection") as null|anything in cleaned_results
+	if(isnull(choice))
+		return
+	var/index_chosen = cleaned_results.Find(choice)
+	load_record(results[index_chosen])
+
+
+// Returns a list of records that match whatever was searched for.
+/datum/managed_browser/persistent_record_viewer/proc/search_records(search_target, search_method)
+	. = list()
+	var/list/all_record_filepaths = get_all_records()
+	for(var/file_path in all_record_filepaths)
+		var/datum/persistent_record/R = SSpersistence.json_to_object(SSpersistence.read_json(file_path))
+		
+		if(!istype(R))
+			continue
+		
+		switch(search_method)
+			if(SEARCH_METHOD_NAME)
+				if(findtext(R.name, search_target))
+					. += file_path
+			
+			if(SEARCH_METHOD_DESC)
+				if(findtext(R.desc, search_target))
+					. += file_path
+			
+			if(SEARCH_METHOD_CREATOR)
+				if(findtext(R.creator_name, search_target))
+					. += file_path
+			
+			if(SEARCH_METHOD_ID)
+				if(findtext(R.unique_id, search_target))
+					. += file_path
+		CHECK_TICK
+
+#undef SEARCH_METHOD_ID
+#undef SEARCH_METHOD_NAME
+#undef SEARCH_METHOD_DESC
+#undef SEARCH_METHOD_CREATOR
+
+// Display.
 
 /datum/managed_browser/persistent_record_viewer/get_html()
 	var/list/dat = list()
@@ -112,15 +181,13 @@
 
 	return dat.Join()
 
-
-
-// Display.
 // Makes the buttons and such for saving/loading/etc records.
 // Shown on the top of the window, acts as a menu bar.
 /datum/managed_browser/persistent_record_viewer/proc/display_file_text()
 	. = list()
 	. += "<center>"
 	. += href(src, list("choose_record" = 1), "Open Record")
+	. += href(src, list("search_record" = 1), "Search for Record")
 	if(loaded_record)
 		. += href(src, list("save_record" = 1), "Save Record")
 	else
@@ -135,6 +202,7 @@
 	. = list()
 	. += "<h2>[R.name]</h2>"
 	. += href(src, list("edit_name" = 1), "Edit Name")
+	. += "<br>"
 	. += "ID: [R.unique_id]<br>"
 	. += "<i>Created by <b>[R.creator_name]</b>.</i><br>"
 	if(admin_view)
@@ -153,10 +221,22 @@
 	. += "<h2>Attachments</h2>"
 	if(!admin_view) // The one thing admin verb can't do, due to not being physical.
 		. += "<i>To upload attachments, scan an object with the machine you are using to access this.</i><br>"
-	for(var/thing in R.attachments)
-		var/datum/record_attachment/A = thing
-		. += href(src, list("open_attachment" = R.attachments.Find(A)), A.title)
+	
+	if(!LAZYLEN(R.attachments))
+		. += "No attachments on this file."
+
+	else if(collapsed_attachments_list)
+		. += href(src, list("toggle_collapsed_attachments_list" = 1), "> ([LAZYLEN(R.attachments)])")
 		. += "<br>"
+	
+	else
+		. += href(src, list("toggle_collapsed_attachments_list" = 1), "V")
+		. += "<br>"
+		for(var/thing in R.attachments)
+			var/datum/record_attachment/A = thing
+			. += " - "
+			. += href(src, list("open_attachment" = R.attachments.Find(A)), A.title)
+			. += "<br>"
 
 
 /datum/managed_browser/persistent_record_viewer/proc/display_attachment(datum/persistent_record/R, datum/record_attachment/A, client/C)
@@ -175,8 +255,29 @@
 	. = list()
 	. += "<hr>"
 	. += "<h2>Logs</h2>"
-	for(var/line in R.logs) // TODO: Truncate superlong log lines and add a button that prints the full log to the chatlog.
-		. += " - [line]<br>"
+
+	if(!LAZYLEN(R.logs))
+		. += "No logs on this file."
+	
+	else if(collapsed_log_list)
+		. += href(src, list("toggle_collapsed_log_list" = 1), "> ([LAZYLEN(R.logs)])")
+		. += "<br>"
+	
+	else
+		. += href(src, list("toggle_collapsed_log_list" = 1), "V")
+		. += "<br>"
+		var/const/line_length_limit = 128
+		for(var/line in R.logs)
+			// Truncate really long lines from the main window. Instead, a button shows up that shows the whole thing in the chatlog.
+			if(length(line) > line_length_limit)
+				. += " - [copytext(line, 1, line_length_limit)]... ([length(line)])"
+				. += href(src, list("show_log_line" = R.logs.Find(line)), "Show Full Log")
+				. += "<br>"
+			else
+				. += " - [line]<br>"
+
+
+
 
 /datum/managed_browser/persistent_record_viewer/proc/can_delete_record(datum/persistent_record/R, client/C)
 	var/obj/item/weapon/card/id/ID = C.mob.GetIdCard()
@@ -197,8 +298,14 @@
 	if(!istype(user))
 		return
 
+	if(href_list["close"])
+		return
+
 	if(href_list["choose_record"])
 		choose_record(user)
+	
+	if(href_list["search_record"])
+		search_query(user)
 	
 	if(href_list["new_record"])
 		make_new_record(user)
@@ -243,7 +350,19 @@
 		if(!(new_desc))
 			return
 		loaded_record.add_record_log("[user.name] changed the description from '[loaded_record.desc]' to '[new_desc]'.")
-		loaded_record.name = new_desc
+		loaded_record.desc = new_desc
+	
+	if(href_list["show_log_line"])
+		var/index = text2num(href_list["show_log_line"])
+		var/full_line = LAZYACCESS(loaded_record?.logs, index)
+		if(full_line)
+			to_chat(user, full_line)
+	
+	if(href_list["toggle_collapsed_log_list"])
+		collapsed_log_list = !collapsed_log_list
+	
+	if(href_list["toggle_collapsed_attachments_list"])
+		collapsed_attachments_list = !collapsed_attachments_list
 	
 	show_to_user(user) // To refresh the window and assign client if needed.
 

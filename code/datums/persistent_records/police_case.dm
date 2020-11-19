@@ -18,6 +18,7 @@
 	var/datum/record_attachment/A = new()
 	A.title = get_record_title()
 	A.content = get_record_content()
+	A.image_id = get_record_image_id()
 	A.uploader_name = ID.registered_name
 	A.uploader_ckey = ckey(user.key)
 	A.uploader_uid = ID.unique_ID
@@ -28,6 +29,12 @@
 
 /obj/proc/get_record_content()
 	return desc
+
+/obj/proc/get_record_image_id()
+	return null
+
+/obj/item/weapon/photo/get_record_image_id()
+	return image_id
 
 /obj/item/weapon/paper/get_record_content()
 	return info

@@ -77,17 +77,23 @@ GLOBAL_VAR_INIT(persistent_record_incrementer, 0)
 
 /datum/persistent_directory/proc/choose_file(mob/user, file_path)
 	var/list/actual_file_paths = get_all_files(file_path)
-	var/list/cleaned_file_paths = list()
-	for(var/thing in actual_file_paths)
-		var/cleaned_path = replacetext(thing, actual_directory, "/")
-		cleaned_path = replacetext(cleaned_path, ".json", "")
-		cleaned_file_paths += cleaned_path
+	var/list/cleaned_file_paths = clean_file_paths(actual_file_paths)
 	
 	var/choice = input(user, "Choose a file.", "File Selection") as null|anything in cleaned_file_paths
 	if(isnull(choice))
 		return
 	var/index_chosen = cleaned_file_paths.Find(choice)
 	return actual_file_paths[index_chosen]
+
+// Changes file paths to be more presentable from an IC standpoint.
+// Note that this will make them mostly worthless for actually loading things,
+// so only use it when showing the paths to the user, e.g. to choose one to load.
+/datum/persistent_directory/proc/clean_file_paths(list/file_paths)
+	. = list()
+	for(var/thing in file_paths)
+		var/cleaned_path = replacetext(thing, actual_directory, "/")
+		cleaned_path = replacetext(cleaned_path, ".json", "")
+		. += cleaned_path
 
 /datum/persistent_directory/court
 	actual_directory = COURT_CASE_FILE_ROOT_DIR

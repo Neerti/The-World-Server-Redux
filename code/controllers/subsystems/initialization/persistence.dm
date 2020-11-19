@@ -80,7 +80,7 @@ SUBSYSTEM_DEF(persistence)
 // The list can be passed to functions that will serialize it into a .json or .sav file.
 // You can use getters instead of direct variable reading, if needed.
 // When overriding, make sure to call `. = ..()` somewhere inside, so you don't exclude the fundemental variables.
-/datum/proc/save_serialized_data()
+/datum/proc/save_serialized_data(list/_options)
 	SHOULD_CALL_PARENT(TRUE)
 	. = list()
 	.[NAMEOF(src, type)] = type
@@ -90,7 +90,7 @@ SUBSYSTEM_DEF(persistence)
 // Generally used when something's getting deserialized.
 // You can use setters instead of direct variable assignment, if needed.
 // An unfortunate quirk of going with DEFINEs is that the input list MUST be named `_data`, which shouldn't conflict with any existing var names.
-/datum/proc/load_deserialized_data(list/_data)
+/datum/proc/load_deserialized_data(list/_data, list/_options)
 	SHOULD_CALL_PARENT(TRUE)
 	persistent_address = _data[NAMEOF(src, persistent_address)]
 
@@ -186,3 +186,35 @@ SUBSYSTEM_DEF(persistence)
 // Returns a duplicate of a serializable object, without writing to disk.
 /datum/controller/subsystem/persistence/proc/clone_object(datum/object)
 	return json_to_object(object_to_json(object, FALSE))
+
+
+
+// Persistent images.
+// Used for things like photos, and the Case DB. All files are `.png`.
+
+// Make sure `image_id` is unique or else images will be overwritten.
+
+// Saves an image file to disk outside of the cache, so it gets perserved.
+/datum/controller/subsystem/persistence/proc/save_image(image, image_id, image_directory)
+	var/full_path = "[image_directory][image_id].png"
+	var/icon/image_to_save = icon(image, dir = SOUTH, frame = 1)
+	fcopy(image_to_save, full_path)
+
+// Loads an image from disk to an icon object.
+// Avoid repeatively calling this if possible.
+/datum/controller/subsystem/persistence/proc/load_image(image_id, image_directory)
+	var/full_path = "[image_directory][image_id].png"
+	if(!fexists(full_path))
+		CRASH("Asked to load a nonexistent image file '[full_path]'.")
+	var/icon/loaded_image = icon(file(full_path))
+	return loaded_image
+	
+
+
+// Deletes an image from disk.
+/datum/controller/subsystem/persistence/proc/delete_image(image_id, image_directory)
+	var/full_path = "[image_directory][image_id].png"
+	if(fexists(full_path))
+		fdel(full_path)
+		return TRUE
+	CRASH("Asked to delete a nonexistent image file '[full_path]'.")
