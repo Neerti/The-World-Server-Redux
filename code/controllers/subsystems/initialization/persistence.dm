@@ -138,7 +138,10 @@ SUBSYSTEM_DEF(persistence)
 // This proc will happily overwrite whatever is in the path, so be aware of that.
 /datum/controller/subsystem/persistence/proc/write_json(json_string, file_path)
 	var/json_file = file(file_path)
-	to_file(json_file, json_string)
+	if(fexists(json_file))
+		fdel(json_file) // This stops the file from getting appended, and breaking the json parser.
+	//to_file(json_file, json_string)
+	text2file(json_string, json_file)
 
 // Reads a json file from disk, retriving the json string contained inside.
 /datum/controller/subsystem/persistence/proc/read_json(file_path)
@@ -151,6 +154,7 @@ SUBSYSTEM_DEF(persistence)
 // Adds some whitespace to make the json formatting easier for humans to read.
 // `json_decode()` ignores it so it's purely for the benefit of humans.
 // However it will add a small amount of overhead when something is being saved.
+// The file size will also be slightly bigger due to the added whitespace.
 /datum/controller/subsystem/persistence/proc/pretty_json(json_string)
 	// Remove existing whitespace, to avoid double pretty-ifying the string if it contains a json string
 	// that was already processed by this proc.

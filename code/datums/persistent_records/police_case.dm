@@ -18,7 +18,7 @@
 	var/datum/record_attachment/A = new()
 	A.title = get_record_title()
 	A.content = get_record_content()
-	A.image_id = get_record_image_id()
+	A.image = get_record_image()
 	A.uploader_name = ID.registered_name
 	A.uploader_ckey = ckey(user.key)
 	A.uploader_uid = ID.unique_ID
@@ -30,14 +30,17 @@
 /obj/proc/get_record_content()
 	return desc
 
-/obj/proc/get_record_image_id()
+/obj/proc/get_record_image()
 	return null
 
-/obj/item/weapon/photo/get_record_image_id()
-	return image_id
+/obj/item/weapon/photo/get_record_image()
+	return img
 
 /obj/item/weapon/paper/get_record_content()
 	return info
+
+/obj/item/weapon/photo/get_record_content()
+	return "[desc][scribble ? "<br>Written on the back: <i>[scribble]</i>" : ""]"
 
 /obj/item/weapon/sample/fibers/get_record_content()
 	var/list/data = list()

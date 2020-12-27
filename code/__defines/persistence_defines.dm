@@ -1,5 +1,6 @@
+// Note: These MUST end with a trailing slash `/`.
 #define PERSISTENT_PHOTO_DIRECTORY "data/persistent/images/photos/"
-
+#define PERSISTENT_RECORD_IMAGE_DIRECTORY "data/persistent/images/records/"
 
 // Saves a 'simple' variable, such as a string, number, list, or assocative list.
 // Intended to be used inside of an overrided 'save_serialized_data()` proc.
@@ -15,6 +16,7 @@
 #define SERIALIZE_OBJECT(X)\
 var/datum/D = ##X;\
 .[NAMEOF(src, ##X)] = D.save_serialized_data();
+
 
 // Loads a 'simple' variable, such as a string, number, list, or assocative list.
 // Intended to be used inside of an overrided `load_deserialized_data()` proc.

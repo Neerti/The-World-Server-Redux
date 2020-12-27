@@ -64,14 +64,16 @@
 		. += " - [line]<br>"
 
 // A lightweight datum that gets held by persistent records.
-// Can represent things ranging from transcripts to photos (TODO).
+// Can represent things ranging from transcripts to photos.
 /datum/record_attachment
-	var/title = null
-	var/content = null
-	var/image_id = null // If set, a persistent image will be loaded and shown to anyone viewing this record.
-	var/uploader_name = null
-	var/uploader_ckey = null
-	var/uploader_uid = null
+	var/title = null			// The 'name' of the attachment.
+	var/content = null			// The 'body' of the attachment, cannot be changed, so it remains authoritative.
+	var/comment = null			// Comments below the 'body', in a seperate area, used to give context or otherwise add onto an attachment.
+	var/image_id = null			// If set, a persistent image will be loaded and shown to anyone viewing this record.
+	var/icon/image = null		// If above var was set, holds the persisted image.
+	var/uploader_name = null	// In-game character name of the uploader.
+	var/uploader_ckey = null	// Holds which player uploaded it, only visible to admins.
+	var/uploader_uid = null		// UID of the uploader, used for authentication.
 
 /datum/record_attachment/proc/display_html(mob/living/user, admin_view = FALSE)
 	. = list()
@@ -84,18 +86,25 @@
 
 /datum/record_attachment/save_serialized_data()
 	. = ..()
-	.[NAMEOF(src, title)] = title
-	.[NAMEOF(src, content)] = content
+	SERIALIZE_VAR(title)
+	SERIALIZE_VAR(content)
+	SERIALIZE_VAR(comment)
+	if(image && !image_id) // If it has an image ID already, it means it was saved previously.
+		image_id = "[game_id]-[md5(world.time)]"
+		SSpersistence.save_image(image, image_id, PERSISTENT_RECORD_IMAGE_DIRECTORY)
 	SERIALIZE_VAR(image_id)
-	.[NAMEOF(src, uploader_name)] = uploader_name
+	SERIALIZE_VAR(uploader_name)
 	SERIALIZE_VAR(uploader_ckey)
 	SERIALIZE_VAR(uploader_uid)
 
 /datum/record_attachment/load_deserialized_data(list/_data)
 	..()
-	title = _data[NAMEOF(src, title)]
-	content = _data[NAMEOF(src, content)]
+	DESERIALIZE_VAR(title)
+	DESERIALIZE_VAR(content)
+	DESERIALIZE_VAR(comment)
 	DESERIALIZE_VAR(image_id)
-	uploader_name = _data[NAMEOF(src, uploader_name)]
-	uploader_ckey = _data[NAMEOF(src, uploader_ckey)]
+	if(image_id)
+		image = SSpersistence.load_image(image_id, PERSISTENT_RECORD_IMAGE_DIRECTORY)
+	DESERIALIZE_VAR(uploader_name)
+	DESERIALIZE_VAR(uploader_ckey)
 	DESERIALIZE_VAR(uploader_uid)

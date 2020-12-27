@@ -98,7 +98,7 @@
 
 #define SEARCH_METHOD_ID		"by unique ID"
 #define SEARCH_METHOD_NAME		"by name"
-#define SEARCH_METHOD_DESC		"by description"
+#define SEARCH_METHOD_DESC		"by content"
 #define SEARCH_METHOD_CREATOR	"by creator"
 
 // Prompts the user to enter a search method and then a string to search for.
@@ -142,8 +142,13 @@
 					. += file_path
 			
 			if(SEARCH_METHOD_DESC)
-				if(findtext(R.desc, search_target))
-					. += file_path
+				var/list/content = list(R.desc)
+				for(var/thing in R.attachments)
+					content += thing
+				for(var/string in content)
+					if(findtext(string, search_target))
+						. += file_path
+						break
 			
 			if(SEARCH_METHOD_CREATOR)
 				if(findtext(R.creator_name, search_target))
@@ -192,6 +197,7 @@
 		. += href(src, list("save_record" = 1), "Save Record")
 	else
 		. += " <b>Save Record</b> "
+	. += "<br>"
 	. += href(src, list("close_record" = 1), "Close Record")
 	. += href(src, list("new_record" = 1), "New Record")
 	. += "</center>"
@@ -242,9 +248,18 @@
 /datum/managed_browser/persistent_record_viewer/proc/display_attachment(datum/persistent_record/R, datum/record_attachment/A, client/C)
 	. = list()
 	. += "<h3>[A.title]</h3>"
+	if(A.image)
+		var/cache_filename = "persistent_record_[REF(A)].png"
+		C << browse_rsc(A.image, cache_filename)
+	//	. += "<img src='[cache_filename]' width='[64*photo_size]' style='-ms-interpolation-mode:nearest-neighbor' />"
+		. += "<img src='[cache_filename]' width='200%' style='-ms-interpolation-mode:nearest-neighbor'>"
+		. += "<br>"
 	. += "[A.content]<br>"
 	. += "<hr>"
 	. += "<i>Uploaded by <b>[A.uploader_name]</b>.</i>"
+	if(A.comment)
+		. += "Comment: [A.comment]<br>"
+	. += href(src, list("edit_comment" = R.attachments.Find(A)), "Edit Comment")
 	if(admin_view)
 		. += " (Ckey: [A.uploader_ckey])<br>"
 	if(can_delete_attachment(R, A, C))
@@ -311,7 +326,7 @@
 		make_new_record(user)
 	
 	if(href_list["close_record"])
-		loaded_record = null
+		close_record()
 
 	if(href_list["save_record"])
 		if(!loaded_record)
